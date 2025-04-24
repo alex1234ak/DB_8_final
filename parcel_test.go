@@ -15,6 +15,8 @@ var (
 	randRange  = rand.New(randSource)
 )
 
+const dbFile = "tracker.db"
+
 func getTestParcel() Parcel {
 	return Parcel{
 		Client:    1000,
@@ -24,19 +26,21 @@ func getTestParcel() Parcel {
 	}
 }
 
-func TestAddGetDelete(t *testing.T) {
-	db, err := sql.Open("sqlite", ":memory:")
+func setupDB(t *testing.T) *sql.DB {
+	db, err := sql.Open("sqlite", dbFile)
 	require.NoError(t, err)
-	defer db.Close()
 
-	_, err = db.Exec(`CREATE TABLE parcel (
-		number INTEGER PRIMARY KEY AUTOINCREMENT,
-		client INTEGER,
-		status TEXT,
-		address TEXT,
-		created_at TEXT
-	)`)
-	require.NoError(t, err)
+	err = db.Ping()
+	if err != nil {
+		t.Fatalf("не удалось подключиться к базе данных %s: %v", dbFile, err)
+	}
+
+	return db
+}
+
+func TestAddGetDelete(t *testing.T) {
+	db := setupDB(t)
+	defer db.Close()
 
 	store := NewParcelStore(db)
 	parcel := getTestParcel()
@@ -45,12 +49,11 @@ func TestAddGetDelete(t *testing.T) {
 	require.NoError(t, err)
 	require.NotZero(t, id)
 
+	parcel.Number = id
+
 	storedParcel, err := store.Get(id)
 	require.NoError(t, err)
-	require.Equal(t, parcel.Client, storedParcel.Client)
-	require.Equal(t, parcel.Status, storedParcel.Status)
-	require.Equal(t, parcel.Address, storedParcel.Address)
-	require.Equal(t, parcel.CreatedAt, storedParcel.CreatedAt)
+	require.Equal(t, parcel, storedParcel)
 
 	err = store.Delete(id)
 	require.NoError(t, err)
@@ -60,18 +63,8 @@ func TestAddGetDelete(t *testing.T) {
 }
 
 func TestSetAddress(t *testing.T) {
-	db, err := sql.Open("sqlite", ":memory:")
-	require.NoError(t, err)
+	db := setupDB(t)
 	defer db.Close()
-
-	_, err = db.Exec(`CREATE TABLE parcel (
-		number INTEGER PRIMARY KEY AUTOINCREMENT,
-		client INTEGER,
-		status TEXT,
-		address TEXT,
-		created_at TEXT
-	)`)
-	require.NoError(t, err)
 
 	store := NewParcelStore(db)
 	parcel := getTestParcel()
@@ -90,18 +83,8 @@ func TestSetAddress(t *testing.T) {
 }
 
 func TestSetStatus(t *testing.T) {
-	db, err := sql.Open("sqlite", ":memory:")
-	require.NoError(t, err)
+	db := setupDB(t)
 	defer db.Close()
-
-	_, err = db.Exec(`CREATE TABLE parcel (
-		number INTEGER PRIMARY KEY AUTOINCREMENT,
-		client INTEGER,
-		status TEXT,
-		address TEXT,
-		created_at TEXT
-	)`)
-	require.NoError(t, err)
 
 	store := NewParcelStore(db)
 	parcel := getTestParcel()
@@ -120,18 +103,8 @@ func TestSetStatus(t *testing.T) {
 }
 
 func TestGetByClient(t *testing.T) {
-	db, err := sql.Open("sqlite", ":memory:")
-	require.NoError(t, err)
+	db := setupDB(t)
 	defer db.Close()
-
-	_, err = db.Exec(`CREATE TABLE parcel (
-		number INTEGER PRIMARY KEY AUTOINCREMENT,
-		client INTEGER,
-		status TEXT,
-		address TEXT,
-		created_at TEXT
-	)`)
-	require.NoError(t, err)
 
 	store := NewParcelStore(db)
 	parcels := []Parcel{
@@ -162,9 +135,6 @@ func TestGetByClient(t *testing.T) {
 	for _, parcel := range storedParcels {
 		expected, exists := parcelMap[parcel.Number]
 		require.True(t, exists)
-		require.Equal(t, expected.Client, parcel.Client)
-		require.Equal(t, expected.Status, parcel.Status)
-		require.Equal(t, expected.Address, parcel.Address)
-		require.Equal(t, expected.CreatedAt, parcel.CreatedAt)
+		require.Equal(t, expected, parcel)
 	}
 }
