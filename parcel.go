@@ -1,12 +1,21 @@
 package main
 
 import (
+	"database/sql"
 	"errors"
 
 	_ "modernc.org/sqlite"
 )
 
-func (s ParcelStore) AddParcel(p Parcel) (int, error) {
+type ParcelStore struct {
+	db *sql.DB
+}
+
+func NewParcelStore(db *sql.DB) ParcelStore {
+	return ParcelStore{db: db}
+}
+
+func (s ParcelStore) Add(p Parcel) (int, error) {
 	res, err := s.db.Exec(
 		"INSERT INTO parcel (client, status, address, created_at) VALUES (?, ?, ?, ?)",
 		p.Client, p.Status, p.Address, p.CreatedAt,
@@ -23,7 +32,7 @@ func (s ParcelStore) AddParcel(p Parcel) (int, error) {
 	return int(id), nil
 }
 
-func (s ParcelStore) GetParcelByNumber(number int) (Parcel, error) {
+func (s ParcelStore) Get(number int) (Parcel, error) {
 	p := Parcel{}
 	row := s.db.QueryRow(
 		"SELECT number, client, status, address, created_at FROM parcel WHERE number = ?",
@@ -36,7 +45,7 @@ func (s ParcelStore) GetParcelByNumber(number int) (Parcel, error) {
 	return p, nil
 }
 
-func (s ParcelStore) GetParcelsByClient(client int) ([]Parcel, error) {
+func (s ParcelStore) GetByClient(client int) ([]Parcel, error) {
 	var res []Parcel
 	rows, err := s.db.Query(
 		"SELECT number, client, status, address, created_at FROM parcel WHERE client = ?",
@@ -63,7 +72,7 @@ func (s ParcelStore) GetParcelsByClient(client int) ([]Parcel, error) {
 	return res, nil
 }
 
-func (s ParcelStore) UpdateStatus(number int, status string) error {
+func (s ParcelStore) SetStatus(number int, status string) error {
 	_, err := s.db.Exec(
 		"UPDATE parcel SET status = ? WHERE number = ?",
 		status, number,
@@ -71,7 +80,7 @@ func (s ParcelStore) UpdateStatus(number int, status string) error {
 	return err
 }
 
-func (s ParcelStore) UpdateAddress(number int, address string) error {
+func (s ParcelStore) SetAddress(number int, address string) error {
 	var status string
 	row := s.db.QueryRow("SELECT status FROM parcel WHERE number = ?", number)
 	err := row.Scan(&status)
@@ -90,7 +99,7 @@ func (s ParcelStore) UpdateAddress(number int, address string) error {
 	return err
 }
 
-func (s ParcelStore) RemoveParcel(number int) error {
+func (s ParcelStore) Delete(number int) error {
 	var status string
 	row := s.db.QueryRow("SELECT status FROM parcel WHERE number = ?", number)
 	err := row.Scan(&status)
